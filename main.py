@@ -39,9 +39,7 @@ app = FastAPI(title="Numify Backend", version="1.3")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "*",  # 🔥 Allow all during testing; restrict later
-    ],
+    allow_origins=["*"],  # allow all during dev; restrict later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -146,7 +144,11 @@ def scraper_thread(uid: str, live_url: str):
                             seen_numbers.add(num)
                             print(f"📞 Found: {num} → {text[:60]}")
 
-                            data = {"timestamp": firestore.SERVER_TIMESTAMP, "number": num, "message": text}
+                            data = {
+                                "timestamp": firestore.SERVER_TIMESTAMP,
+                                "number": num,
+                                "message": text,
+                            }
                             sessions[uid]["numbers"].append(data)
 
                             # Save to Firestore
@@ -180,7 +182,6 @@ def scraper_thread(uid: str, live_url: str):
 
 @app.post("/start")
 async def start_scraping(request: Request):
-    """Start TikTok live scraping session."""
     uid = verify_token_get_uid_from_header(request.headers.get("authorization"))
     payload = await request.json()
     live_url = payload.get("live_url")
@@ -209,7 +210,6 @@ async def start_scraping(request: Request):
 
 @app.post("/stop")
 async def stop_scraping(request: Request):
-    """Stop user's scraping session."""
     uid = verify_token_get_uid_from_header(request.headers.get("authorization"))
     if uid in sessions:
         sessions[uid]["running"] = False
@@ -220,7 +220,6 @@ async def stop_scraping(request: Request):
 
 @app.get("/stream")
 async def stream_numbers(request: Request):
-    """Stream extracted numbers in real-time (SSE)."""
     token = request.query_params.get("token")
     if not token:
         raise HTTPException(status_code=401, detail="Missing ?token param")
@@ -247,5 +246,15 @@ async def stream_numbers(request: Request):
 
 @app.get("/")
 def root():
-    """Health check endpoint."""
     return {"message": "✅ Numify backend is running on Render"}
+
+
+# ============================================================
+# 🚀 Entry Point for Render
+# ============================================================
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 10000))
+    print(f"🚀 Starting server on port {port}")
+    uvicorn.run("main:app", host="0.0.0.0", port=port)

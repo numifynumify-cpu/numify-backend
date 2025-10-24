@@ -1,26 +1,31 @@
-# Use official Playwright image with Python and browsers installed
-FROM mcr.microsoft.com/playwright/python:v1.42.0-jammy
+# Use official Python base image
+FROM python:3.10-slim
 
-# Set working directory
+# Set work directory
 WORKDIR /app
 
-# Copy dependency files first (for caching)
+# Install system dependencies for Playwright
+RUN apt-get update && apt-get install -y wget libnss3 libatk-bridge2.0-0 libxkbcommon0 libdrm2 libgbm1 libasound2 libxshmfence1 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy dependencies
 COPY requirements.txt .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all source code
-COPY . .
-
-# Ensure playwright browsers are installed
+# Install Playwright browsers
 RUN playwright install --with-deps chromium
 
-# Expose Render’s port (Render provides PORT env variable)
+# Copy source code
+COPY . .
+
+# Expose port
 EXPOSE 10000
 
-# Start the FastAPI app using Uvicorn
+# Command to run app
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "10000"]
+
 
 
 

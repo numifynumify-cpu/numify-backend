@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: numify-backend
+    env: docker
+    dockerfilePath: Dockerfile
+    plan: starter
+    region: oregon

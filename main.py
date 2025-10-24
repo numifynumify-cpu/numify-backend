@@ -13,23 +13,29 @@ import firebase_admin
 from firebase_admin import credentials, auth as firebase_auth, firestore
 
 # ============================================================
-# 🔥 Firebase Initialization
+# 🔥 Firebase Initialization (Render Safe)
 # ============================================================
 
-SERVICE_ACCOUNT_PATH = "serviceAccountKey.json"
+# Load Firebase credentials from environment variable
+firebase_json = os.getenv("FIREBASE_CREDENTIALS")
 
-if not os.path.exists(SERVICE_ACCOUNT_PATH):
-    raise RuntimeError("❌ serviceAccountKey.json file not found in backend folder")
+if not firebase_json:
+    raise RuntimeError("❌ FIREBASE_CREDENTIALS environment variable not set on Render")
 
-cred = credentials.Certificate(SERVICE_ACCOUNT_PATH)
-firebase_admin.initialize_app(cred)
-db = firestore.client()
+try:
+    firebase_dict = json.loads(firebase_json)
+    cred = credentials.Certificate(firebase_dict)
+    firebase_admin.initialize_app(cred)
+    db = firestore.client()
+    print("✅ Firebase initialized successfully")
+except Exception as e:
+    raise RuntimeError(f"❌ Failed to initialize Firebase: {e}")
 
 # ============================================================
 # ⚙️ FastAPI Configuration
 # ============================================================
 
-app = FastAPI(title="Numify Backend", version="1.2")
+app = FastAPI(title="Numify Backend", version="1.3")
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,8 +55,8 @@ app.add_middleware(
 # ============================================================
 
 sessions: Dict[str, Dict] = {}
-HEADLESS = os.environ.get("HEADLESS", "false").lower() == "true"
-BROWSER_PATH = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+HEADLESS = os.environ.get("HEADLESS", "true").lower() == "true"  # Run headless by default on Render
+BROWSER_PATH = os.environ.get("BROWSER_PATH")  # Optional override if needed
 
 # ============================================================
 # 📞 Helpers
@@ -109,7 +115,6 @@ def scraper_thread(uid: str, live_url: str):
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=HEADLESS,
-                executable_path=BROWSER_PATH,
                 args=["--disable-blink-features=AutomationControlled"],
             )
 
@@ -246,4 +251,4 @@ async def stream_numbers(request: Request):
 @app.get("/")
 def root():
     """Health check."""
-    return {"message": "✅ Numify backend is running"}
+    return {"message": "✅ Numify backend is running on Render"}

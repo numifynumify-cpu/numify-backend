@@ -16,7 +16,6 @@ from firebase_admin import credentials, auth as firebase_auth, firestore
 # 🔥 Firebase Initialization (Render Safe)
 # ============================================================
 
-# Load Firebase credentials from environment variable
 firebase_json = os.getenv("FIREBASE_CREDENTIALS")
 
 if not firebase_json:
@@ -25,7 +24,8 @@ if not firebase_json:
 try:
     firebase_dict = json.loads(firebase_json)
     cred = credentials.Certificate(firebase_dict)
-    firebase_admin.initialize_app(cred)
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app(cred)
     db = firestore.client()
     print("✅ Firebase initialized successfully")
 except Exception as e:
@@ -40,10 +40,7 @@ app = FastAPI(title="Numify Backend", version="1.3")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "https://numify.web.app",
-        "https://numify.onrender.com",
+        "*",  # 🔥 Allow all during testing; restrict later
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -55,8 +52,8 @@ app.add_middleware(
 # ============================================================
 
 sessions: Dict[str, Dict] = {}
-HEADLESS = os.environ.get("HEADLESS", "true").lower() == "true"  # Run headless by default on Render
-BROWSER_PATH = os.environ.get("BROWSER_PATH")  # Optional override if needed
+HEADLESS = os.environ.get("HEADLESS", "true").lower() == "true"
+BROWSER_PATH = os.environ.get("BROWSER_PATH")
 
 # ============================================================
 # 📞 Helpers
@@ -250,5 +247,5 @@ async def stream_numbers(request: Request):
 
 @app.get("/")
 def root():
-    """Health check."""
+    """Health check endpoint."""
     return {"message": "✅ Numify backend is running on Render"}

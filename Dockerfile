@@ -14,8 +14,29 @@ COPY requirements.txt .
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browsers
-RUN playwright install --with-deps chromium
+# Install Playwright browsers (fixed for Debian Trixie on Render)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    fonts-unifont \
+    fonts-ubuntu \
+    libnss3 \
+    libxss1 \
+    libasound2 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libgtk-3-0 \
+    libdrm2 \
+    libgbm1 \
+    libxshmfence1 \
+    libxkbcommon0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    libxrender1 \
+    wget && \
+    rm -rf /var/lib/apt/lists/* && \
+    playwright install chromium
+
 
 # Copy source code
 COPY . .

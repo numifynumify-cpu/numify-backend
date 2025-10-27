@@ -13,7 +13,7 @@ import firebase_admin
 from firebase_admin import credentials, auth as firebase_auth, firestore
 
 # ============================================================
-# 🔥 Firebase Initialization (Render Safe)
+# 🔥 Firebase Initialization
 # ============================================================
 
 firebase_json = os.getenv("FIREBASE_CREDENTIALS")
@@ -32,14 +32,14 @@ except Exception as e:
     raise RuntimeError(f"❌ Failed to initialize Firebase: {e}")
 
 # ============================================================
-# ⚙️ FastAPI Configuration
+# ⚙️ FastAPI Config
 # ============================================================
 
-app = FastAPI(title="Numify Backend", version="1.3")
+app = FastAPI(title="Numify Backend", version="1.4")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # allow all during dev; restrict later
+    allow_origins=["*"],  # allow all during dev
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -58,7 +58,7 @@ BROWSER_PATH = os.environ.get("BROWSER_PATH")
 # ============================================================
 
 def extract_numbers(text: str) -> Set[str]:
-    """Extract valid 8-digit Tunisian numbers from text."""
+    """Extract valid Tunisian numbers."""
     found = set()
 
     try:
@@ -96,7 +96,7 @@ def verify_firebase_token(id_token: str) -> str:
         raise HTTPException(status_code=401, detail="Invalid or expired ID token")
 
 # ============================================================
-# 🤖 Scraper Logic
+# 🤖 Scraper Logic (Fixed and Updated)
 # ============================================================
 
 def scraper_thread(uid: str, live_url: str):
@@ -110,24 +110,53 @@ def scraper_thread(uid: str, live_url: str):
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=HEADLESS,
-                args=["--disable-blink-features=AutomationControlled"],
+                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
             )
 
-            context = browser.new_context()
+            # ✅ Add realistic user-agent to avoid TikTok blocking
+            context = browser.new_context(
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                )
+            )
             page = context.new_page()
             page.goto(live_url, timeout=60000)
             time.sleep(8)
 
             print("⚠️ Waiting for TikTok chat messages to load...")
 
+            # ✅ Wait for any chat selector to appear
+            selectors = [
+                "div[data-e2e='chat-message']",
+                "div[class*='ChatMessage']",
+                "div[class*='DivCommentItem']",
+                "span[class*='comment']",
+                "p[class*='chat']"
+            ]
+            chat_selector = None
+            for sel in selectors:
+                try:
+                    page.wait_for_selector(sel, timeout=8000)
+                    chat_selector = sel
+                    break
+                except Exception:
+                    continue
+
+            if not chat_selector:
+                print("❌ No chat messages found after waiting.")
+                sessions[uid]["running"] = False
+                browser.close()
+                return
+
+            print(f"✅ Using chat selector: {chat_selector}")
+
             sessions[uid]["running"] = True
             sessions[uid].setdefault("numbers", [])
 
             while sessions[uid]["running"]:
-                elements = page.query_selector_all("div[data-e2e='chat-message']")
-                if not elements:
-                    elements = page.query_selector_all("div[class*='chat']")
-
+                elements = page.query_selector_all(chat_selector)
                 for e in elements:
                     try:
                         text = e.inner_text().strip()
@@ -151,7 +180,7 @@ def scraper_thread(uid: str, live_url: str):
                             }
                             sessions[uid]["numbers"].append(data)
 
-                            # Save to Firestore
+                            # ✅ Firestore write
                             try:
                                 doc_ref = db.collection("extractions").document(uid)
                                 db.collection("extractions").document(uid).collection("numbers").add({
@@ -244,15 +273,10 @@ async def stream_numbers(request: Request):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-# ✅ FIXED ROOT ENDPOINT FOR RENDER HEALTH CHECK
 @app.api_route("/", methods=["GET", "HEAD"])
 def root(request: Request):
     return {"message": "✅ Numify backend is running on Render"}
 
-
-# ============================================================
-# 🚀 Entry Point for Render
-# ============================================================
 
 if __name__ == "__main__":
     import uvicorn

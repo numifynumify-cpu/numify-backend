@@ -244,8 +244,9 @@ async def stream_numbers(request: Request):
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-@app.get("/")
-def root():
+# ✅ FIXED ROOT ENDPOINT FOR RENDER HEALTH CHECK
+@app.api_route("/", methods=["GET", "HEAD"])
+def root(request: Request):
     return {"message": "✅ Numify backend is running on Render"}
 
 
@@ -258,3 +259,4 @@ if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
     print(f"🚀 Starting server on port {port}")
     uvicorn.run("main:app", host="0.0.0.0", port=port)
+

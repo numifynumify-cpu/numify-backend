@@ -3,3 +3,5 @@ uvicorn[standard]
 playwright==1.40.0
 phonenumbers
 firebase-admin
+httpx
+
